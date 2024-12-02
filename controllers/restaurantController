@@ -1,0 +1,122 @@
+const db = require('../config/firebase');
+
+const createRestaurant = async (req, res) => {
+  try {
+    const { name, location, cuisineType, status } = req.body;
+
+    if (!name || !location || !cuisineType) {
+      return res.status(400).json({ message: 'Todos os campos obrigatórios devem ser preenchidos' });
+    }
+
+    const newRestaurantRef = db.ref('restaurants').push();
+    const newRestaurant = {
+      id: newRestaurantRef.key,
+      name,
+      location,
+      cuisineType,
+      status: status || 'Open',
+    };
+
+    await newRestaurantRef.set(newRestaurant);
+
+    res.status(201).json(newRestaurant);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+const getAllRestaurants = async (req, res) => {
+  try {
+    const snapshot = await db.ref('restaurants').once('value');
+    const restaurants = snapshot.val();
+
+    if (restaurants) {
+      const restaurantsArray = Object.entries(restaurants).map(([id, restaurant]) => ({ id, ...restaurant }));
+      res.status(200).json({ status: 'success', data: { restaurants: restaurantsArray } });
+    } else {
+      res.status(200).json({ status: 'success', data: { restaurants: [] } });
+    }
+  } catch (err) {
+    console.error('Error fetching restaurants:', err);
+    res.status(400).json({ status: 'fail', message: err.message });
+  }
+};
+
+const getRestaurantById = async (req, res) => {
+  try {
+    const snapshot = await db.ref(`restaurants/${req.params.id}`).once('value');
+    const restaurant = snapshot.val();
+
+    if (!restaurant) {
+      return res.status(404).json({ message: 'Restaurante não encontrado' });
+    }
+
+    res.status(200).json(restaurant);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const updateRestaurant = async (req, res) => {
+  try {
+    const restaurantRef = db.ref(`restaurants/${req.params.id}`);
+    const snapshot = await restaurantRef.once('value');
+    const restaurant = snapshot.val();
+
+    if (!restaurant) {
+      return res.status(404).json({ message: 'Restaurante não encontrado' });
+    }
+
+    await restaurantRef.update(req.body);
+    const updatedRestaurant = (await restaurantRef.once('value')).val();
+
+    res.status(200).json(updatedRestaurant);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+const deleteRestaurant = async (req, res) => {
+  try {
+    const restaurantRef = db.ref(`restaurants/${req.params.id}`);
+    const snapshot = await restaurantRef.once('value');
+    const restaurant = snapshot.val();
+
+    if (!restaurant) {
+      return res.status(404).json({ message: 'Restaurante não encontrado' });
+    }
+
+    await restaurantRef.remove();
+
+    res.status(200).json({ message: 'Restaurante deletado com sucesso' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const getRestaurantsByCuisineType = async (req, res) => {
+    try {
+      const { cuisineType } = req.params;
+      const snapshot = await db.ref('restaurants').orderByChild('cuisineType').equalTo(cuisineType).once('value');
+      const restaurants = snapshot.val();
+  
+      if (restaurants) {
+        const restaurantsArray = Object.entries(restaurants).map(([id, restaurant]) => ({ id, ...restaurant }));
+        res.status(200).json({ status: 'success', data: { restaurants: restaurantsArray } });
+      } else {
+        res.status(200).json({ status: 'success', data: { restaurants: [] } });
+      }
+    } catch (err) {
+      console.error('Error fetching restaurants by cuisine type:', err);
+      res.status(400).json({ status: 'fail', message: err.message });
+    }
+};
+
+module.exports = {
+  createRestaurant,
+  getAllRestaurants,
+  getRestaurantById,
+  updateRestaurant,
+  deleteRestaurant,
+  getRestaurantsByCuisineType,
+};
